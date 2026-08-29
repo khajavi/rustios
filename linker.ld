@@ -1,4 +1,4 @@
-OUTPUT_FORMAT(elf64-x86-64)
+OUTPUT_FORMAT(elf32-i386)
 ENTRY(_start)
 
 SECTIONS
@@ -8,23 +8,10 @@ SECTIONS
   .text :
   {
     *(.multiboot)
-    *(.bootstrap)
     *(.text*)
   }
 
-  .rodata :
-  {
-    *(.rodata*)
-  }
-
-  .data :
-  {
-    *(.data*)
-  }
-
-  .bss :
-  {
-    *(COMMON)
-    *(.bss*)
-  }
+  .rodata : { *(.rodata*) }
+  .data   : { *(.data*) }
+  .bss    : { *(COMMON) *(.bss*) }
 }

@@ -1,6 +1,6 @@
 { lib, stdenv, rust, binutils }:
 
-# Build a freestanding x86_64 Rust kernel as an ELF executable.
+# Build a freestanding 32-bit x86 Rust kernel as an ELF executable.
 stdenv.mkDerivation {
   pname = "rustios";
   version = "0.1.0";
@@ -13,7 +13,7 @@ stdenv.mkDerivation {
     runHook preBuild
     rustc \
       --edition 2021 \
-      --target x86_64-unknown-none \
+      --target i686-unknown-linux-gnu \
       --emit=obj \
       -C opt-level=z \
       -C relocation-model=static \
@@ -21,8 +21,9 @@ stdenv.mkDerivation {
       -C panic=abort \
       src/main.rs \
       -o main.o
-    $CC -c boot.s -o boot.o
+    $CC -m32 -c boot.s -o boot.o
     ld \
+      -m elf_i386 \
       -T ${./linker.ld} \
       -z noexecstack \
       boot.o main.o \

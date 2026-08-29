@@ -1,4 +1,4 @@
 [toolchain]
 channel = "stable"
 components = [ "rust-src", "rustfmt", "llvm-tools" ]
-targets = [ "x86_64-unknown-none" ]
+targets = [ "i686-unknown-linux-gnu" ]
