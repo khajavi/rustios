@@ -114,6 +114,43 @@ fn serial_write(s: &[u8]) {
     }
 }
 
+const PIT_CMD: u16 = 0x43;
+const PIT_CH0: u16 = 0x40;
+const PIT_FREQ: u64 = 1_193_182; // 8254 input clock, Hz
+
+fn pit_init() {
+    // Program channel 0 as a 16-bit rate generator (mode 2), reload 0 = 65536.
+    unsafe {
+        outb(PIT_CMD, 0x34);
+        outb(PIT_CH0, 0x00);
+        outb(PIT_CH0, 0x00);
+    }
+}
+
+fn pit_read() -> u16 {
+    unsafe {
+        outb(PIT_CMD, 0x00); // latch channel 0
+        let lo = inb(PIT_CH0) as u16;
+        let hi = inb(PIT_CH0) as u16;
+        (hi << 8) | lo
+    }
+}
+
+fn delay_ms(ms: u32) {
+    let mut remaining = ms as u64 * PIT_FREQ / 1000;
+    let mut last = pit_read() as u64;
+    while remaining > 0 {
+        let now = pit_read() as u64;
+        let elapsed = if now <= last {
+            last - now
+        } else {
+            last + 65536 - now
+        };
+        last = now;
+        remaining -= elapsed.min(remaining);
+    }
+}
+
 fn vga_clear() {
     for i in 0..80 * 25 {
         unsafe {
@@ -250,28 +287,25 @@ fn font_glyph(c: u8) -> [u8; 7] {
     }
 }
 
-fn fb_draw_text(fb: &Framebuffer, msg: &[u8], start_x: u32, start_y: u32, scale: u32) {
-    let mut cx = start_x;
-    for &c in msg {
-        let glyph = font_glyph(c);
-        for (row, bits) in glyph.iter().enumerate() {
-            for col in 0..5 {
-                if bits & (1 << (4 - col)) != 0 {
-                    for sy in 0..scale {
-                        for sx in 0..scale {
-                            fb_put_pixel(
-                                fb,
-                                cx + (col as u32 * scale) + sx,
-                                start_y + (row as u32 * scale) + sy,
-                                true,
-                            );
-                        }
+fn fb_draw_char(fb: &Framebuffer, c: u8, x: u32, y: u32, scale: u32) -> u32 {
+    let glyph = font_glyph(c);
+    for (row, bits) in glyph.iter().enumerate() {
+        for col in 0..5 {
+            if bits & (1 << (4 - col)) != 0 {
+                for sy in 0..scale {
+                    for sx in 0..scale {
+                        fb_put_pixel(
+                            fb,
+                            x + (col as u32 * scale) + sx,
+                            y + (row as u32 * scale) + sy,
+                            true,
+                        );
                     }
                 }
             }
         }
-        cx += 6 * scale;
     }
+    6 * scale
 }
 
 #[no_mangle]
@@ -283,12 +317,18 @@ pub extern "C" fn kmain(boot_info: usize, magic: usize) -> ! {
 
     if magic == MULTIBOOT2_BOOTLOADER_MAGIC as usize {
         if let Some(fb) = unsafe { find_framebuffer(boot_info) } {
+            pit_init();
             fb_clear(&fb);
             let scale = core::cmp::max(1, fb.width / 200);
-            let w = 13 * 6 * scale;
+            let msg = b"Hello World!";
+            let w = (msg.len() as u32) * 6 * scale;
             let x = (fb.width.saturating_sub(w)) / 2;
             let y = (fb.height / 2) - 4 * scale;
-            fb_draw_text(&fb, b"HELLO, WORLD!", x, y, scale);
+            let mut cx = x;
+            for &c in msg {
+                cx += fb_draw_char(&fb, c, cx, y, scale);
+                delay_ms(500);
+            }
         }
     }
 
