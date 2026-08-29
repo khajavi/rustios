@@ -61,6 +61,64 @@ static MULTIBOOT_HEADER: Multiboot2Header = Multiboot2Header {
 
 const MULTIBOOT2_BOOTLOADER_MAGIC: u32 = 0x36d76289;
 
+// I/O port helpers used by the PIT timer (8254).
+unsafe fn outb(port: u16, val: u8) {
+    core::arch::asm!(
+        "out dx, al",
+        in("dx") port,
+        in("al") val,
+        options(nomem, nostack, preserves_flags)
+    );
+}
+
+unsafe fn inb(port: u16) -> u8 {
+    let val: u8;
+    core::arch::asm!(
+        "in al, dx",
+        out("al") val,
+        in("dx") port,
+        options(nomem, nostack, preserves_flags)
+    );
+    val
+}
+
+const PIT_CMD: u16 = 0x43;
+const PIT_CH0: u16 = 0x40;
+const PIT_FREQ: u64 = 1_193_182; // 8254 input clock, Hz
+
+fn pit_init() {
+    // Program channel 0 as a 16-bit rate generator (mode 2), reload 0 = 65536.
+    unsafe {
+        outb(PIT_CMD, 0x34);
+        outb(PIT_CH0, 0x00);
+        outb(PIT_CH0, 0x00);
+    }
+}
+
+fn pit_read() -> u16 {
+    unsafe {
+        outb(PIT_CMD, 0x00); // latch channel 0
+        let lo = inb(PIT_CH0) as u16;
+        let hi = inb(PIT_CH0) as u16;
+        (hi << 8) | lo
+    }
+}
+
+fn delay_ms(ms: u32) {
+    let mut remaining = ms as u64 * PIT_FREQ / 1000;
+    let mut last = pit_read() as u64;
+    while remaining > 0 {
+        let now = pit_read() as u64;
+        let elapsed = if now <= last {
+            last - now
+        } else {
+            last + 65536 - now
+        };
+        last = now;
+        remaining -= elapsed.min(remaining);
+    }
+}
+
 #[derive(Clone, Copy)]
 struct Framebuffer {
     addr: usize,
@@ -191,6 +249,7 @@ pub extern "C" fn kmain(boot_info: usize, magic: usize) -> ! {
         if let Some(fb) = unsafe { find_framebuffer(boot_info) } {
             let green = green(&fb);
             fb_clear(&fb, 0);
+            pit_init();
 
             let scale = FRAMEBUFFER_WIDTH / 100; // large font: 800 / 100 = 8
             let msg = b"Hello, World!";
@@ -201,6 +260,7 @@ pub extern "C" fn kmain(boot_info: usize, magic: usize) -> ! {
             let mut cx = x;
             for &c in msg {
                 cx += fb_draw_char(&fb, c, cx, y, scale, green);
+                delay_ms(500);
             }
         }
     }
