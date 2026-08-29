@@ -1,4 +1,4 @@
-{ lib, stdenv, rust }:
+{ lib, stdenv, rust, binutils }:
 
 # Build a freestanding x86_64 Rust kernel as an ELF executable.
 stdenv.mkDerivation {
@@ -7,19 +7,25 @@ stdenv.mkDerivation {
 
   src = ./.;
 
-  nativeBuildInputs = [ rust ];
+  nativeBuildInputs = [ rust binutils ];
 
   buildPhase = ''
     runHook preBuild
     rustc \
       --edition 2021 \
       --target x86_64-unknown-none \
-      -C link-arg=-T${./linker.ld} \
-      -C link-arg=-no-pie \
+      --emit=obj \
       -C opt-level=z \
       -C relocation-model=static \
       -C prefer-dynamic=no \
+      -C panic=abort \
       src/main.rs \
+      -o main.o
+    $CC -c boot.s -o boot.o
+    ld \
+      -T ${./linker.ld} \
+      -z noexecstack \
+      boot.o main.o \
       -o kernel
     runHook postBuild
   '';
