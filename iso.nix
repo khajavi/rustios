@@ -16,6 +16,8 @@ stdenv.mkDerivation {
     cat > isofiles/boot/grub/grub.cfg <<EOF
     set timeout=0
     set default=0
+    set gfxmode=text
+    terminal_output console
     menuentry "rustios" {
       multiboot2 /boot/kernel.bin
       boot

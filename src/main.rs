@@ -86,6 +86,15 @@ fn serial_write(s: &[u8]) {
     }
 }
 
+fn vga_clear() {
+    for i in 0..80 * 25 {
+        unsafe {
+            *VGA_BUFFER.add(i * 2) = b' ';
+            *VGA_BUFFER.add(i * 2 + 1) = 0x0f;
+        }
+    }
+}
+
 fn vga_write(s: &[u8]) {
     for (i, &value) in s.iter().enumerate() {
         unsafe {
@@ -99,6 +108,7 @@ fn vga_write(s: &[u8]) {
 pub extern "C" fn _start() -> ! {
     serial_init();
     serial_write(b"Hello, World!\n");
+    vga_clear();
     vga_write(b"Hello, World!");
 
     loop {}

@@ -33,7 +33,7 @@
           export PATH="${pkgs.qemu}/bin:$PATH"
           exec qemu-system-x86_64 \
             -cdrom ${self.packages.${pkgs.system}.iso}/rustios.iso \
-            -serial stdio -no-reboot -boot d
+            -no-reboot -boot d
         '';
       });
     };
