@@ -44,10 +44,24 @@ static MULTIBOOT_HEADER: Multiboot2Header = Multiboot2Header {
 
 // The VGA text buffer: 80 columns x 25 rows of (byte, attribute) pairs.
 const VGA_BUFFER: usize = 0xb8000;
+const VGA_COLS: usize = 80;
+const VGA_ROWS: usize = 25;
 const WHITE_ON_BLACK: u8 = 0x0f;
+
+// Blank the whole text screen so no leftover boot-loader text shows through.
+fn vga_clear() {
+    for i in 0..VGA_COLS * VGA_ROWS {
+        let cell = VGA_BUFFER + i * 2;
+        unsafe {
+            core::ptr::write_volatile(cell as *mut u8, b' ');
+            core::ptr::write_volatile((cell + 1) as *mut u8, WHITE_ON_BLACK);
+        }
+    }
+}
 
 #[no_mangle]
 pub extern "C" fn kmain(_boot_info: usize, _magic: usize) -> ! {
+    vga_clear();
     let s = b"Hello, World!";
     for (i, &c) in s.iter().enumerate() {
         let cell = VGA_BUFFER + i * 2;
