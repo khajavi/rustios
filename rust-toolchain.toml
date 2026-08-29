@@ -1,4 +1,6 @@
+# The only thing we need from the stable toolchain is the compiler itself
+# plus the std library prebuilt for our target. We never use cargo, rustfmt,
+# or the other components, so they are left out.
 [toolchain]
 channel = "stable"
-components = [ "rust-src", "rustfmt", "llvm-tools" ]
 targets = [ "i686-unknown-linux-gnu" ]
