@@ -1,4 +1,8 @@
+# The only thing we need from the stable toolchain is the compiler itself
+# plus the `core` library built for the bare x86_64 target. rust-src is needed
+# so rusc can find the core library sources for the x86_64-unknown-none target;
+# the other components (rustfmt, llvm-tools) are not used.
 [toolchain]
 channel = "stable"
-components = [ "rust-src", "rustfmt", "llvm-tools" ]
+components = [ "rust-src" ]
 targets = [ "x86_64-unknown-none" ]
