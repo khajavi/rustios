@@ -1,5 +1,5 @@
 {
-  description = "Declarative C hello-world kernel booted with QEMU";
+  description = "Declarative assembly hello-world kernel booted with QEMU";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
