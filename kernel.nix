@@ -1,26 +1,33 @@
-{ stdenv, rust, binutils }:
+{ stdenv, binutils }:
 
-# Build a freestanding 32-bit x86 Rust kernel as an ELF executable.
+# Build a freestanding 32-bit x86 C kernel as an ELF executable.
 #
-# We avoid Cargo entirely and call rustc directly: the project has no
-# dependencies, so the whole Cargo machinery would only add complexity.
+# We compile with the same C compiler that Nix is built with (stdenv.cc)
+# rather than pulling in a whole toolchain, because the only files involved
+# are our kernel and the plain GNU assembler.
 stdenv.mkDerivation {
   pname = "rustios";
   version = "0.1.0";
 
   src = ./.;
 
-  nativeBuildInputs = [ rust binutils ];
+  nativeBuildInputs = [ binutils ];
 
   buildPhase = ''
-    # 1. Turn the Rust source into one CPU object file.
-    rustc \
-      --edition 2021 \
-      --target i686-unknown-linux-gnu \
-      --emit=obj \
-      -C opt-level=z \
-      -C panic=abort \
-      src/main.rs \
+    # 1. Compile the C source into one 32-bit freestanding object file.
+    #    `-m32` produces i386 code; `-ffreestanding` tells the compiler there
+    #    is no host C runtime to fall back on; `-nostdlib` and `-fno-builtin`
+    #    stop it from assuming library functions like memcpy exist.
+    $CC \
+      -m32 \
+      -ffreestanding \
+      -nostdlib \
+      -fno-builtin \
+      -fno-stack-protector \
+      -O2 \
+      -Wall \
+      -Wextra \
+      -c src/main.c \
       -o main.o
 
     # 2. Assemble the tiny 32-bit bootstrap stub (boot.s).
