@@ -72,20 +72,21 @@ static const unsigned int multiboot_header[6] = {
 #define VGA_COLS 80
 #define VGA_ROWS 25
 #define WHITE_ON_BLACK 0x0f
+#define RED_ON_BLACK   0x0c
 
 /* Draw one character at screen position `index` (0 = very top-left cell).
  * The buffer is declared volatile so the compiler cannot "optimize away" our
  * writes to memory that it does not know anyone reads. */
-static void put_char(unsigned index, char c) {
+static void put_char(unsigned index, char c, unsigned char attr) {
     VGA_BUFFER[index * 2] = (unsigned char)c;       /* the character    */
-    VGA_BUFFER[index * 2 + 1] = WHITE_ON_BLACK;     /* its color        */
+    VGA_BUFFER[index * 2 + 1] = attr;               /* its color        */
 }
 
 /* Fill every cell of the screen with a space so that no leftover boot-loader
  * text can show through behind our message. */
 static void vga_clear(void) {
     for (unsigned i = 0; i < VGA_COLS * VGA_ROWS; i++)
-        put_char(i, ' ');
+        put_char(i, ' ', WHITE_ON_BLACK);
 }
 
 /* ---------------------------------------------------------------------------
@@ -108,6 +109,7 @@ void kmain(unsigned long boot_info, unsigned long magic) {
     vga_clear();
     const char *s = "Hello, World!";
     for (unsigned i = 0; s[i] != '\0'; i++)
-        put_char(i, s[i]);
+        /* the first letter is red, the rest are white */
+        put_char(i, s[i], i == 0 ? RED_ON_BLACK : WHITE_ON_BLACK);
     for (;;) { }                /* park the CPU: this is the "end"          */
 }
