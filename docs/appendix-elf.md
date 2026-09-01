@@ -34,14 +34,23 @@ Let's see an ELF file in action. We have two invaluable tools, both in
 - **`objdump`** — disassembles it (machine code → assembly) and shows section
   contents.
 
-Run them on our built kernel:
+Run them on our built kernel (passing the build path inline, so it works in
+any shell):
 
 ```bash
-K=$(nix build .#default --no-link --print-out-paths)/kernel
-readelf -h $K      # the ELF header
-readelf -S $K      # the section table
-objdump -d $K      # the disassembly
+K=$(nix build .#default --no-link --print-out-paths)      # bash / sh
+readelf -h "$K/kernel"    # the ELF header
+readelf -S "$K/kernel"    # the section table
+objdump -d "$K/kernel"    # the disassembly
 ```
+
+> Using **fish**? The `set` command replaces `K=...`:
+> ```fish
+> set K (nix build .#default --no-link --print-out-paths)
+> readelf -h $K/kernel
+> readelf -S $K/kernel
+> objdump -d $K/kernel
+> ```
 
 ## The big picture: an ELF file's anatomy
 
