@@ -109,8 +109,10 @@ There are three ideas to absorb:
    the front of the binary in a dedicated section so GRUB finds it first.
 
 The "framebuffer request tag" you see (type `5`) is how we *ask* the boot
-loader, "please start me up with an 800x600 32-bit graphical framebuffer." We
-will use that in [Step 5](05-framebuffer.md).
+loader, "please start me up with an 800x600 32-bit graphical framebuffer."
+It is only used on the sibling *framebuffer* branches. Here we keep the
+header minimal (just the end tag) and instead write to the **VGA text buffer**
+in [Step 5](05-vga-text.md).
 
 ### Where does the "Hello" actually start?
 

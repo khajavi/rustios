@@ -161,7 +161,7 @@ That's it — you've built a real operating-system kernel:
 - a **32→64 bootstrap** that builds page tables and flips the CPU into long
   mode,
 - **serial** output for debugging,
-- a **graphical framebuffer** renderer that draws a 5×7 font,
+- a **VGA text** display that writes straight into the `0xB8000` buffer,
 - a **PIT-timer** busy-wait that animates the text.
 
 And you did it all with **Nix**, so the whole project builds reproducibly with

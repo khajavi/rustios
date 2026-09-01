@@ -34,8 +34,7 @@ _start:
 GRUB calls our `_start` with two gifts in registers:
 
 - **`eax` = `0x36d76289`** — the multiboot2 magic number, proof of a valid boot,
-- **`ebx` = address** of the multiboot2 information structure (we parse this in
-  Step 5 to find the framebuffer).
+- **`ebx` = address** of the multiboot2 information structure.
 
 We move them to `edi`/`esi` because, once we are in 64-bit mode and call the
 Rust function `kmain`, the **System V calling convention** says the first two
@@ -150,11 +149,12 @@ The loop ends with `%eax > ...` after 512 iterations, so the table is complete.
 
 ### Why also map the top 1 GiB?
 
-We map `pd_high` (VA 3–4 GiB) as well. That's because the boot loader hands us
-a **graphical framebuffer** whose memory lives way up high — on QEMU it landed
-at physical `0xFD000000`, around 4 GiB. If we didn't map that region, the
-moment Step 5's code writes a pixel to the framebuffer, the CPU would page-fault
-and the screen stays black. So we reserve a whole high GiB and identity-map it:
+We map `pd_high` (VA 3–4 GiB) as well. On the sibling *framebuffer* branches
+the boot loader hands us a **graphical framebuffer** whose memory lives way
+up high — on QEMU it landed at physical `0xFD000000`, around 4 GiB. If we
+didn't map that region, the moment that branch's code writes a pixel to the
+framebuffer, the CPU would page-fault and the screen stays black. So we
+reserve a whole high GiB and identity-map it:
 
 ```asm
 movl $0xC0000083, %eax         # phys 3 GiB, 2 MiB page, P+RW+PS
@@ -249,6 +249,6 @@ stand out and are worth knowing:
 ## Check your progress
 
 At this point you should be able to boot and see *at least* serial output, and
-no crashes. If your QEMU window is black, that's fine for now — the framebuffer
-comes in Step 5. In [Step 4](04-serial.md) we add a serial port so we can
+no crashes. If your QEMU window is blank, that's fine for now — the VGA text
+screen comes in Step 5. In [Step 4](04-serial.md) we add a serial port so we can
 actually *see* what the kernel is doing.

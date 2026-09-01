@@ -6,7 +6,7 @@ kernel-debugger's answer is the **serial port**: a slow, simple, universally
 emulated way to send bytes out of the machine that QEMU can redirect to a host
 file or console.
 
-Even after we get the graphical framebuffer (Step 5), serial output remains
+Even after we put text on the VGA screen (Step 5), serial output remains
 invaluable — a kernel crash that whites out the screen can still print to
 serial.
 
@@ -130,5 +130,5 @@ serial_write(b"kernel alive! ticks?\n");
 ```
 
 Rebuild with `nix build .#iso` and boot again. The new text is proof that your
-whole bootstrap → Rust handoff works end to end. Next, [Step 5](05-framebuffer.md)
-turns on the graphics.
+whole bootstrap → Rust handoff works end to end. Next, [Step 5](05-vga-text.md)
+turns on the screen.

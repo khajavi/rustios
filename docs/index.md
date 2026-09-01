@@ -1,8 +1,8 @@
 # Rust OS Kernel Tutorial (from zero to "Hello World!")
 
 Welcome! This tutorial walks you through **building your very own operating
-system kernel in Rust**, from an empty folder to a real graphical "Hello
-World!" that you can boot in the QEMU emulator.
+system kernel in Rust**, from an empty folder to a real "Hello World!" that
+you can boot in the QEMU emulator and see on screen.
 
 You do **not** need any prior kernel experience. We assume only that you:
 
@@ -22,7 +22,7 @@ By the end you will have a kernel that:
 2. starts in **32-bit mode** and switches itself into **64-bit long mode**
    (this turning point is the single hardest, most interesting part);
 3. talks over the **serial port** so you can debug it;
-4. asks GRUB for a **graphical framebuffer** and draws text pixel by pixel;
+4. writes text directly into the **VGA text buffer** at `0xB8000`;
 5. animates `Hello World!` one character at a time using a **hardware timer**.
 
 ---
@@ -79,7 +79,7 @@ matters. Each chapter ends with a checkable result.
 | 2 | [Nix makes it declarative](02-nix.md) | Reproducible builds, a flake, an ISO | `nix build .#iso` produces a bootable ISO |
 | 3 | [The 32→64 bootstrap](03-bootstrap.md) | Protected mode, long mode, GDT, paging (PAE) | The CPU successfully enters 64-bit mode |
 | 4 | [Talk over the serial port](04-serial.md) | I/O ports, the 16550 UART, debugging | "Hello, World!" appears in `/tmp/serial.log` |
-| 5 | [The graphical framebuffer](05-framebuffer.md) | Multiboot tags, reading hardware info, drawing pixels | "Hello World" drawn on the QEMU screen |
+| 5 | [Writing to VGA text](05-vga-text.md) | The VGA text buffer at `0xB8000`, writing characters | "Hello World" shown in the QEMU window |
 | 6 | [Animate with the PIT timer](06-pit.md) | The 8254 timer, busy-waiting, measuring time | "Hello World!" types itself, 500 ms per char |
 
 Let's begin with [Step 1](01-freestanding.md).
