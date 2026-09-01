@@ -1,7 +1,7 @@
 # Step 5 — Writing to VGA text
 
-We have a working 64-bit kernel that prints to serial. Now the fun part:
-putting text on the **QEMU window** itself.
+We have a booting kernel that reaches `kmain`. Now the fun part: putting text
+on the **QEMU window** itself.
 
 ## Concept: what VGA text mode is
 
@@ -38,38 +38,36 @@ Address     Byte   Meaning
 ...         ...    ...
 ```
 
-## Writing one character in Rust
+## Writing one character in C
 
 The character at screen position `index` (0 = very top-left cell) lives at
 address `VGA_BUFFER + index * 2`:
 
-```rust
-const VGA_BUFFER: usize = 0xb8000;
-const VGA_COLS: usize = 80;
-const VGA_ROWS: usize = 25;
-const WHITE_ON_BLACK: u8 = 0x0f;
+```c
+#define VGA_BUFFER ((volatile unsigned char *)0xb8000)
+#define VGA_COLS 80
+#define VGA_ROWS 25
+#define WHITE_ON_BLACK 0x0f
 
-fn put_char(index: usize, c: u8) {
-    unsafe {
-        core::ptr::write_volatile((VGA_BUFFER + index * 2) as *mut u8, c);
-        core::ptr::write_volatile((VGA_BUFFER + index * 2 + 1) as *mut u8, WHITE_ON_BLACK);
-    }
+static void put_char(unsigned index, char c, unsigned char attr) {
+    VGA_BUFFER[index * 2]     = (unsigned char)c;   /* the character */
+    VGA_BUFFER[index * 2 + 1] = attr;               /* its color     */
 }
 ```
 
-We use `write_volatile` because these writes go to real memory-mapped hardware
-that the compiler does not know about; it must not cache or reorder them away.
+We declare the buffer `volatile` because these writes go to real memory-mapped
+hardware that the compiler does not know about; it must not cache or reorder
+them away.
 
 ## Clearing the screen
 
 Boot loaders leave their own text on the screen, so first we blank every cell
 with a space. There are 80 × 25 = 2000 cells:
 
-```rust
-fn vga_clear() {
-    for i in 0..VGA_COLS * VGA_ROWS {
-        put_char(i, b' ');
-    }
+```c
+static void vga_clear(void) {
+    for (unsigned i = 0; i < VGA_COLS * VGA_ROWS; i++)
+        put_char(i, ' ', WHITE_ON_BLACK);
 }
 ```
 
@@ -81,11 +79,10 @@ handful of instructions.)
 Because text mode is just memory, printing is a trivial loop over the
 characters of the string, placing each into the next cell:
 
-```rust
-let s = b"Hello, World!";
-for (i, &c) in s.iter().enumerate() {
-    put_char(i, c);
-}
+```c
+const char *s = "Hello, World!";
+for (unsigned i = 0; s[i] != '\0'; i++)
+    put_char(i, s[i], WHITE_ON_BLACK);
 ```
 
 No font, no scaling, no centering math — the hardware handles all of that for
@@ -93,17 +90,21 @@ us.
 
 ## Wiring it into `kmain`
 
-```rust
-#[no_mangle]
-pub extern "C" fn kmain(_boot_info: usize, _magic: usize) -> ! {
+```c
+__attribute__((noreturn))
+void kmain(unsigned long boot_info, unsigned long magic) {
+    (void)boot_info;
+    (void)magic;
     vga_clear();
-    let s = b"Hello, World!";
-    for (i, &c) in s.iter().enumerate() {
-        put_char(i, c);
-    }
-    loop {}     // keep the kernel alive
+    const char *s = "Hello, World!";
+    for (unsigned i = 0; s[i] != '\0'; i++)
+        put_char(i, s[i], i == 0 ? RED_ON_BLACK : WHITE_ON_BLACK);
+    for (;;) { }     /* keep the kernel alive */
 }
 ```
+
+(Here the first letter is drawn in red and the rest in white — a tiny flourish
+that shows how easy the color attribute is to vary per character.)
 
 ## Why VGA text and not the frame buffer?
 
@@ -121,9 +122,9 @@ pixel by pixel — a much bigger step.)
 nix run .#run
 ```
 
-A QEMU window opens and you should see **"Hello, World!"** in bright white text
-at the top-left of the screen. If the window is empty or has leftover boot
-loader text, suspect your `vga_clear` loop or the `index * 2` cell addressing.
+A QEMU window opens and you should see **"Hello, World!"** — first letter red,
+rest white — at the top-left of the screen. If the window is empty or has
+leftover boot loader text, suspect your `vga_clear` loop or the
+`index * 2` cell addressing.
 
-Next, in [Step 6](06-pit.md), we make it type itself out one character at a
-time using a hardware timer.
+Next, in [Step 6](06-next-steps.md), we review what we built and where to go next.

@@ -1,22 +1,21 @@
 # Step 2 — Nix makes the build declarative
 
-## Why not just `rustc`?
+## Why not just `gcc`?
 
-To turn `src/main.rs` + `boot.s` into something GRUB can boot, you hand-run a
+To turn `src/main.c` + `boot.s` into something GRUB can boot, you hand-run a
 fragile chain:
 
 ```bash
-rustc --edition 2021 --target x86_64-unknown-none --emit=obj \
-  -C opt-level=z -C relocation-model=static -C prefer-dynamic=no \
-  -C panic=abort src/main.rs -o main.o
-gcc -c boot.s -o boot.o
-ld -T linker.ld -z noexecstack boot.o main.o -o kernel
+gcc -m32 -ffreestanding -nostdlib -fno-builtin -fno-stack-protector -O2 \
+  -c src/main.c -o main.o
+as --32 boot.s -o boot.o
+ld -m elf_i386 -T linker.ld -z noexecstack boot.o main.o -o kernel
 ```
 
 That works — but it's:
 
-- **Not reproducible**: `rustc`, `gcc`, `ld`, and the *Rust target* must be
-  the exact right versions, installed by hand.
+- **Not reproducible**: `gcc`, `as`, and `ld` must be the exact right
+  versions, installed by hand.
 - **Easy to get wrong**: three separate tools, many flags, and a linker
   script. Miss one flag and the kernel silently fails to boot.
 - **Not shareable**: a teammate has to set up the same toolchain.
@@ -43,7 +42,7 @@ it's what makes a "kernel" out of ordinary object files. It tells the linker
 *which memory addresses* to place each section at:
 
 ```ld
-OUTPUT_FORMAT(elf64-x86-64)
+OUTPUT_FORMAT(elf32-i386)
 ENTRY(_start)                 /* execution starts at the assembly symbol _start */
 
 SECTIONS
@@ -53,8 +52,7 @@ SECTIONS
   .text :                     /* executable code */
   {
     *(.multiboot)             /* multiboot2 header FIRST  */
-    *(.bootstrap)             /* then the 32->64 bootstrap */
-    *(.text*)                 /* then the Rust code        */
+    *(.text*)                 /* then the kernel's code   */
   }
 
   .rodata : { *(.rodata*) }   /* read-only data (constants) */
@@ -77,32 +75,21 @@ entry points looked like `0x10004e`, `0x1000ce`, etc.)
 ## `kernel.nix` — the "compile it" recipe
 
 ```nix
-{ lib, stdenv, rust, binutils }:
+{ stdenv, binutils }:
 
 stdenv.mkDerivation {
   pname = "rustios";
   version = "0.1.0";
   src = ./.;
 
-  nativeBuildInputs = [ rust binutils ];   # tools available during build
+  nativeBuildInputs = [ binutils ];   # as + ld; gcc comes from stdenv
 
   buildPhase = ''
-    rustc \
-      --edition 2021 \
-      --target x86_64-unknown-none \
-      --emit=obj \
-      -C opt-level=z \
-      -C relocation-model=static \
-      -C prefer-dynamic=no \
-      -C panic=abort \
-      src/main.rs \
-      -o main.o
-    $CC -c boot.s -o boot.o          # assemble the bootstrap
-    ld                             # link everything together
-      -T ${./linker.ld} \
-      -z noexecstack \
-      boot.o main.o \
-      -o kernel
+    $CC -m32 -ffreestanding -nostdlib -fno-builtin -fno-stack-protector -O2 \
+      -c src/main.c -o main.o        # compile the C kernel, no host runtime
+    as --32 boot.s -o boot.o          # assemble the 32-bit bootstrap
+    ld -m elf_i386 -T ${./linker.ld} -z noexecstack \
+      boot.o main.o -o kernel        # link everything together
   '';
 
   installPhase = ''
@@ -116,11 +103,15 @@ The interesting flags:
 
 | Flag | Meaning |
 |------|---------|
-| `--target x86_64-unknown-none` | "freestanding 64-bit x86; there is no OS." |
-| `--emit=obj` | produce an object file, not a final executable (we link ourselves). |
-| `-C opt-level=z` | optimize for small size (a kernel should be tiny). |
-| `-C relocation-model=static` | no position-independent code; the kernel must be linked to its fixed address. |
-| `-C panic=abort` | on panic, just abort (don't unwind the stack — we have no unwinder). |
+| `-m32` | produce 32-bit i386 code (we are an i686 kernel). |
+| `-ffreestanding` | there is no host C runtime; avoid assuming one. |
+| `-nostdlib` | do not link the standard library. |
+| `-fno-builtin` | don't silently replace our calls (e.g. `memcpy`) with builtins. |
+| `-fno-stack-protector` | kernels have no canary/OS support; disable the guard. |
+| `as --32` / `ld -m elf_i386` | assemble and link as 32-bit. |
+
+Because `stdenv` provides the C compiler, the only extra tool we need is
+`binutils` (for `as` and `ld`).
 
 ## `iso.nix` — making it bootable
 
@@ -129,7 +120,7 @@ A raw kernel ELF is not bootable by itself. GRUB needs it inside a *disk image*
 a boot directory and a GRUB config file.
 
 ```nix
-{ lib, stdenv, kernel, grub2, xorriso }:
+{ stdenv, kernel, grub2, xorriso }:
 
 stdenv.mkDerivation {
   pname = "rustios-iso";
@@ -161,7 +152,7 @@ stdenv.mkDerivation {
 
 Key line: **`multiboot2 /boot/kernel.bin`**. This tells GRUB "the file at
 `/boot/kernel.bin` is a multiboot2 kernel — load it and start it." GRUB then
-*reads the multiboot2 header* our Rust code defined in Step 1 to decide where
+*reads the multiboot2 header* our C code defined in Step 1 to decide where
 and how to load it.
 
 ## `flake.nix` — one command to rule them all
@@ -170,10 +161,10 @@ The flake is the public face. If you never touch `kernel.nix` or `iso.nix`
 again, you use the commands that the flake exposes:
 
 ```nix
-outputs = { self, nixpkgs, rust-overlay }: {
+outputs = { self, nixpkgs }: {
   packages = forAllSystems (pkgs: {
-    default = pkgs.callPackage ./kernel.nix { ... };  # raw kernel
-    iso     = pkgs.callPackage ./iso.nix   { ... };  # bootable ISO
+    default = pkgs.callPackage ./kernel.nix { };   # raw kernel
+    iso     = pkgs.callPackage ./iso.nix   { };   # bootable ISO
     run     = pkgs.writeShellScriptBin "rustios-run" ''
       exec qemu-system-x86_64 -cdrom ${...iso...}/rustios.iso -no-reboot -boot d
     '';
@@ -189,8 +180,8 @@ nix build .#iso       # the bootable ISO
 nix run .#run         # build everything and boot it in QEMU
 ```
 
-The `rust-overlay` input pins a known Rust toolchain (declared in
-`rust-toolchain.toml`), so the compiler version never secretly changes.
+The flake's only input is `nixpkgs` — no special toolchain overlay is needed,
+because the kernel is built with the plain C compiler that Nix already provides.
 
 ## Check your progress
 
@@ -199,5 +190,5 @@ nix build .#iso --no-link --print-out-paths
 ```
 
 You should see a Nix store path ending in ..., and inside it `rustios.iso`.
-If that works, you have a **reproducible kernel build**. Next we make the CPU
-actually switch into 64-bit mode in [Step 3](03-bootstrap.md).
+If that works, you have a **reproducible kernel build**. Next we look at the
+bootstrap in [Step 3](03-bootstrap.md).
