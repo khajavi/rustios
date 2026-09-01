@@ -101,4 +101,8 @@ file $(nix build .#default --no-link --print-out-paths)/kernel
 
 The `file` output should say something like *ELF 32-bit LSB executable, Intel
 80386* — proof that our C and assembly really produced a 32-bit kernel.
+
+> Ever wondered what an ELF actually is — what's inside that `kernel` file and
+> how GRUB reads it? See [Appendix A — What is an ELF file?](appendix-elf.md).
+
 Next, [Step 5](05-vga-text.md) finally puts text on the screen.

@@ -80,4 +80,9 @@ matters. Each chapter ends with a checkable result.
 | 6 | [Putting it all together / next steps](06-next-steps.md) | Review what you built and where to go next | a working, bootable kernel |
 | 7 | [The multiboot2 header, for beginners](07-multiboot.md) | A deep dive into the boot-loader handshake | see your `e8 52 50 d6` magic bytes |
 
+## Appendix
+
+- [Appendix A — What is an ELF file?](appendix-elf.md) — the standard "box"
+  that holds your machine code plus the metadata GRUB needs to load it.
+
 Let's begin with [Step 1](01-freestanding.md).
