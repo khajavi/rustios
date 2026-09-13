@@ -1,17 +1,17 @@
 OUTPUT_FORMAT(elf32-i386)
-ENTRY(_start)
 
 SECTIONS
 {
-  . = 1M;
+  /* The BIOS loads the first 512 bytes of the disk to physical address
+     *0x7C00* and jumps there. Place the entire boot sector at that address. */
+  . = 0x7C00;
 
   .text :
   {
-    *(.multiboot)
-    *(.text*)
+    *(.text)
   }
 
-  .rodata : { *(.rodata*) }
-  .data   : { *(.data*) }
-  .bss    : { *(COMMON) *(.bss*) }
+  /* Drop the assembler's incidental metadata sections so the flattened
+     binary is exactly one 512-byte sector. */
+  /DISCARD/ : { *(.comment) *(.eh_frame) *(.note*) }
 }
