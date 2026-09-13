@@ -11,6 +11,8 @@ You do **not** need any prior kernel experience. We assume only that you:
 - have [Nix](https://nixos.org/download) installed (we use it to build and
   run everything, so you never have to fight with toolchain installs).
 
+**If you've never seen assembly language before**, don't worry! Before you hit the `boot.s` file in Step 3, we've included [Step 3a — Assembly language primer](03a-assembly-primer.md), which teaches you everything from scratch: registers, the call stack, x86-32 syntax, and how to read assembly code. Come back to it if assembly looks alien at first.
+
 Everything you will build here is **real** — it is the exact same code that
 ships in the `rustios` project you are reading. Every step ends with a working
 program you can run, and each later step builds directly on the one before it.
@@ -74,6 +76,7 @@ matters. Each chapter ends with a checkable result.
 |------|-------|----------------|----------------|
 | 1 | [Your first freestanding kernel](01-freestanding.md) | A C program with no OS; the multiboot2 header | boots a `_start` that halts |
 | 2 | [Nix makes it declarative](02-nix.md) | Reproducible builds, a flake, an ISO | `nix build .#iso` produces a bootable ISO |
+| 3a | [Assembly language primer](03a-assembly-primer.md) | **Registers, the stack, calling conventions, x86-32 syntax — everything you need to read `boot.s`** | understand every line of assembly |
 | 3 | [The stack and entry point](03-bootstrap.md) | 32-bit protected mode, the call stack, `boot.s` | the CPU reaches `kmain` |
 | 4 | [How the build works](04-freestanding-c.md) | Freestanding C, assembling and linking the kernel | a coherent `kernel` ELF |
 | 5 | [Writing to VGA text](05-vga-text.md) | The VGA text buffer at `0xB8000`, writing characters | "Hello World" shown in the QEMU window |

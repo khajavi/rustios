@@ -88,6 +88,12 @@ The very first bytes of the file. `readelf -h` shows it. The key fields:
   64-bit branches).
 - **`Entry point address`** — the virtual address where execution begins.
   For us this is `_start`, at `0x100000` (1 MiB, placed by our linker script).
+
+  > Warning: if the `ENTRY(_start)` symbol from your linker script is missing,
+  > `ld` silently falls back to the *first byte of the first executable
+  > section*. In our kernel that means the multiboot2 header — data being
+  > executed as code. See the cautionary tale in
+  > [Step 3](03-bootstrap.md).
 - **`Type`** — `EXEC` (an executable) vs `REL` (a relocatable object file).
   Our `main.o` is `REL`; the final `kernel` is `EXEC`.
 

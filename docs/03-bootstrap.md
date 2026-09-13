@@ -108,6 +108,75 @@ memory — and the kernel crashes instantly or executes garbage. Symptom:
 GRUB loads the kernel, then the screen goes blank or QEMU shows a reset/hang
 with no output. Fix: `movl $stack_top, %esp` before any `call` or `push`.
 
+## What happens if you "remove" boot.s? (a cautionary tale)
+
+It is a very natural experiment to comment out *everything* in `boot.s` ("the
+kernel still boots, so do we even need this file?"). And here is the
+surprising part: **the kernel keeps booting and printing "Hello, World!"**
+— we confirmed it by reading the VGA buffer straight out of QEMU. So what is
+`boot.s` actually for, if the OS works without it?
+
+The answer is that the OS does *not* work without it — it only *appears* to,
+thanks to two accidents lining up. Here is exactly what happens.
+
+### Accident 1: the entry point silently collapses
+
+Our linker script says `ENTRY(_start)`. If `_start` no longer exists (delete
+`boot.s`, or just live-comment it), `ld` quietly falls back to **the first
+byte of the first executable section** — which is the multiboot2 *header*
+itself:
+
+```bash
+readelf -h kernel | grep Entry
+#   Entry point address:               0x100000   (was 0x100018 with boot.s)
+```
+
+`0x100000` is your `multiboot_header` array — data that was never meant to be
+executed. GRUB obediently jumps there anyway, because the ELF header says so.
+
+### Accident 2: the header bytes happen to be harmless
+
+Executed as code, our 24 header bytes decode to instructions like:
+`salc`, `push %eax`, `call +0x00`, `addb %al, (%eax)`… These turn out to be
+mostly **writes to an address beyond your RAM** (`0x36d76289` with our magic
+in `eax`), which the memory controller silently drops in QEMU. Execution then
+runs off the end of the header, through a little padding, and *falls straight
+into `kmain`* — which prints "Hello, World!" while reading garbage from the
+stack for its arguments.
+
+> This is why we set the magic/checksum the way we do. If the header bytes
+> decoded differently — different magic, different layout — the CPU would
+> fault before ever reaching `kmain`.
+
+### The moment it stops working: use your arguments
+
+With `boot.s` gone, the fall-through hands `kmain` whatever garbage the
+header-instructions left on the stack. That is invisible only because our
+`kmain` throws its arguments away (`(void)boot_info; (void)magic;`). The
+instant a kernel actually *validates* its boot loader (which every real
+kernel must), the difference shows:
+
+| Build | Entry point | What `kmain` sees as `magic` | Screen |
+|-------|-------------|------------------------------|--------|
+| with `boot.s` | `0x100018` (`_start`) | `0x36d76289` ✅ (from `eax`) | "Hello, World!" |
+| without `boot.s` | `0x100000` (header bytes) | garbage ❌ | "BAD MAGIC!" |
+
+So `boot.s` is not decorative. It is the **handover contract**:
+
+1. It turns GRUB's *register* handoff (`eax` = magic, `ebx` = boot info) into
+   what C's cdecl calling convention expects — arguments on the stack.
+2. It gives the C code a **real stack** (`ESP` is undefined at hand-off per
+   the multiboot2 spec; a kernel must not rely on whatever the boot loader
+   happened to leave behind).
+
+Remove it and you are betting that two accidents (harmless header bytes + a
+usable leftover stack) will always line up. On a different emulator, real
+hardware, or with a slightly different header, that bet fails — and GRUB will
+jump into data and the machine will reset or crash.
+
+**Moral:** "it boots" is not "it is correct." Keep `boot.s`; it is the
+guaranteed way to get from GRUB's world to your C code.
+
 ## Check your progress
 
 At this point you should be able to boot and reach `kmain` without crashing.
